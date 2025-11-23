@@ -30,10 +30,20 @@ RUN adduser \
     --uid "${UID}" \
     appuser
 
+# Install system build deps required for some Python packages (psycopg2, etc.).
+# Keep this step before pip install so packages that need libpq/pg_config can build.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Download dependencies as a separate step to take advantage of Docker's caching.
 # Leverage a cache mount to /root/.cache/pip to speed up subsequent builds.
 # Leverage a bind mount to requirements.txt to avoid having to copy them into
-# into this layer.
+# this layer.
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=bind,source=requirements.txt,target=requirements.txt \
     python -m pip install -r requirements.txt
