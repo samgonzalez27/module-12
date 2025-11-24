@@ -81,5 +81,7 @@ class CalculationRead(BaseModel):
     b: float
     type: CalcType
     result: float | None = None
+    # include optional user foreign-key reference for read payloads
+    user_id: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
