@@ -132,6 +132,62 @@ Run tests locally:
 pytest -q
 ```
 
+Running the new tests
+---------------------
+
+- Create and activate a virtual environment (recommended):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+- Run the full test suite (unit + integration):
+
+```bash
+./.venv/bin/pytest -q
+```
+
+- Run only unit tests (example):
+
+```bash
+./.venv/bin/pytest -q tests/test_unit_*.py
+```
+
+- Run a single test file (example for the factory tests):
+
+```bash
+./.venv/bin/pytest -q tests/test_calculation_factory.py
+```
+
+- Run Postgres integration tests locally (they are skipped unless `DATABASE_URL` is set):
+
+Set `DATABASE_URL` to a running Postgres instance and run the tests that require it. Example using Docker Postgres:
+
+```bash
+# run a local Postgres container
+docker run --name calc-postgres -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=test_db -p 5432:5432 -d postgres:15
+
+# run only the Postgres integration tests
+DATABASE_URL=postgresql://test:test@localhost:5432/test_db \
+	./.venv/bin/pytest -q tests/test_integration_postgres_calculation.py
+```
+
+- CI: The repository contains a GitHub Actions workflow (`.github/workflows/ci-postgres.yml`) that starts a Postgres service and runs the full test suite.
+
+Docker Hub image
+-----------------
+
+Replace the placeholder below with your Docker Hub image if you push the built image there:
+
+```
+docker.io/<your-dockerhub-username>/<repo-name>:<tag>
+```
+
+If you want, I can add a short `Makefile` with common commands (start, stop, test, test-postgres) or a `docker-compose.yml` snippet to run Postgres + app + pgAdmin locally.
+
 Submission / Assignment checklist
 -------------------------------
 
