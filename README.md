@@ -175,6 +175,135 @@ DATABASE_URL=postgresql://test:test@localhost:5432/test_db \
 	./.venv/bin/pytest -q tests/test_integration_postgres_calculation.py
 ```
 
+Integration tests (detailed)
+----------------------------
+
+These instructions show how to run integration tests that need a running Postgres instance and how to run the full test suite locally.
+
+- Start a Postgres instance (using Docker Compose or a single container):
+
+```bash
+# Option A: start the full Compose stack (recommended for development)
+docker compose up --build -d
+
+# Option B: run a single Postgres container (fast, for CI-like tests)
+docker run --name calc-postgres -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=test_db -p 5432:5432 -d postgres:15
+```
+
+- Wait for Postgres to become ready. A simple, robust way is to retry the connection in a small loop; for quick manual runs a short `sleep` usually suffices:
+
+```bash
+sleep 3
+```
+
+- Run the integration tests that require Postgres (set `DATABASE_URL` to point at your DB):
+
+```bash
+# run all integration tests
+DATABASE_URL=postgresql://test:test@localhost:5432/test_db \
+	./.venv/bin/pytest -q tests/integration
+
+# run a single Postgres-focused test file
+DATABASE_URL=postgresql://test:test@localhost:5432/test_db \
+	./.venv/bin/pytest -q tests/test_integration_postgres_calculation.py
+```
+
+- Notes:
+	- If you used `docker compose up` the service name for the DB in the compose file resolves inside Docker to `db` (or whatever service name is defined in `compose.yaml`). When running tests from your host set `DATABASE_URL` to `postgresql://<user>:<pass>@localhost:<port>/<db>`.
+	- The project CI workflow already demonstrates how to start a Postgres service and run the tests; see `.github/workflows/ci-postgres.yml` for the CI setup.
+
+Manual checks via OpenAPI (Swagger UI)
+-------------------------------------
+
+FastAPI exposes an interactive OpenAPI UI which is useful for manual verification and exploratory checks.
+
+1. Start the application (either via Uvicorn or Docker Compose):
+
+```bash
+# from the project root, with your virtualenv active
+uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
+
+# or via Compose (builds and starts app + db + pgadmin)
+docker compose up --build -d
+```
+
+2. Open the Swagger UI in your browser:
+
+	- http://127.0.0.1:8000/docs  (Swagger UI)
+	- http://127.0.0.1:8000/redoc  (ReDoc)
+
+3. Register a user (via the UI or curl). Example using `curl`:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/users/register \
+	-H 'Content-Type: application/json' \
+	-d '{"username":"alice","email":"alice@example.com","password":"pw"}' | jq
+```
+
+4. Obtain a token (call the token endpoint):
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/users/token \
+	-H 'Content-Type: application/json' \
+	-d '{"username":"alice","password":"pw"}' | jq
+
+# the response contains an `access_token` value
+```
+
+5. Authorize in the Swagger UI:
+
+	- Click the **Authorize** button in the top-right of the Swagger UI.
+	- The security dialog shows a Bearer token input. Paste the token as either:
+		- `Bearer <access_token>`  (include the `Bearer ` prefix), or
+		- just the raw token (if the UI accepts it) — either works with this app.
+
+6. Call protected endpoints in the UI (for example `POST /calculations`) and inspect responses.
+
+7. Manual curl example for a protected endpoint (after obtaining `TOKEN`):
+
+```bash
+TOKEN="<paste-access-token-here>"
+curl -s -X POST http://127.0.0.1:8000/calculations \
+	-H 'Content-Type: application/json' \
+	-H "Authorization: Bearer ${TOKEN}" \
+	-d '{"a":3,"b":4,"type":"add"}' | jq
+```
+
+Environment and secrets
+-----------------------
+
+- `SECRET_KEY`: set this in your environment for production or CI. The app falls back to a built-in developer secret for local testing, but you should provide a strong `SECRET_KEY` before deploying or publishing images.
+- `DATABASE_URL`: used by the SQLAlchemy engine. For integration tests set this to the Postgres connection string as shown above.
+
+Quick checklist for a reproducible local run
+------------------------------------------
+
+1. Create and activate the venv, install requirements:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+2. Start a Postgres instance (Compose or single container):
+
+```bash
+docker compose up --build -d
+# or the single-container example shown earlier
+```
+
+3. Export env and run tests:
+
+```bash
+export DATABASE_URL=postgresql://test:test@localhost:5432/test_db
+export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+pytest -q
+```
+
+If you want, I can also add a short troubleshooting subsection that checks for common issues (port conflicts, Docker permissions, CI caching of dependencies). Let me know if you want that included.
+
 - CI: The repository contains a GitHub Actions workflow (`.github/workflows/ci-postgres.yml`) that starts a Postgres service and runs the full test suite.
 
 Docker Hub image
